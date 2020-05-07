@@ -13,11 +13,11 @@ void cropLidarPoints(std::vector<LidarPoint> &lidarPoints, float minX, float max
 {
     std::vector<LidarPoint> newLidarPts; 
     for(auto it=lidarPoints.begin(); it!=lidarPoints.end(); ++it) {
-        
-       if( (*it).x>=minX && (*it).x<=maxX && (*it).z>=minZ && (*it).z<=maxZ && (*it).z<=0.0 && abs((*it).y)<=maxY && (*it).r>=minR )  // Check if Lidar point is outside of boundaries
-       {
-           newLidarPts.push_back(*it);
-       }
+        // Check if Lidar point is outside of boundaries 
+        if( (*it).x>=minX && (*it).x<=maxX && (*it).z>=minZ && (*it).z<=maxZ && (*it).z<=0.0 && abs((*it).y)<=maxY && (*it).r>=minR ) 
+        {
+            newLidarPts.push_back(*it);
+        }
     }
 
     lidarPoints = newLidarPts;
@@ -113,13 +113,17 @@ void showLidarImgOverlay(cv::Mat &img, std::vector<LidarPoint> &lidarPoints, cv:
     cv::Mat X(4,1,cv::DataType<double>::type);
     cv::Mat Y(3,1,cv::DataType<double>::type);
     for(auto it=lidarPoints.begin(); it!=lidarPoints.end(); ++it) {
-
+            // X and Y are Homogeneous Coordinates
+            // Translation: Euclidean -> Homogeneous
             X.at<double>(0, 0) = it->x;
             X.at<double>(1, 0) = it->y;
             X.at<double>(2, 0) = it->z;
             X.at<double>(3, 0) = 1;
 
+            // This equation project a 3D Lidar point X in space to a 2D image point Y
             Y = P_rect_xx * R_rect_xx * RT * X;
+
+            // Scaling: Homogeneous -> Euclidean 
             cv::Point pt;
             pt.x = Y.at<double>(0, 0) / Y.at<double>(0, 2);
             pt.y = Y.at<double>(1, 0) / Y.at<double>(0, 2);

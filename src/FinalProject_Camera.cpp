@@ -50,6 +50,7 @@ int main(int argc, const char *argv[])
     string lidarFileType = ".bin";
 
     // calibration data for camera and lidar
+    // store calibration data in OpenCV matrices
     cv::Mat P_rect_00(3,4,cv::DataType<double>::type); // 3x4 projection matrix after rectification
     cv::Mat R_rect_00(4,4,cv::DataType<double>::type); // 3x3 rectifying rotation to make image planes co-planar
     cv::Mat RT(4,4,cv::DataType<double>::type); // rotation matrix and translation vector
@@ -78,6 +79,7 @@ int main(int argc, const char *argv[])
 
     for (size_t imgIndex = 0; imgIndex <= imgEndIndex - imgStartIndex; imgIndex+=imgStepWidth)
     {
+        ReturnVal retVal = {0, 0.0f};
         /* LOAD IMAGE INTO BUFFER */
 
         // assemble filenames for current index
@@ -90,9 +92,18 @@ int main(int argc, const char *argv[])
 
         // push image into data frame buffer
         DataFrame frame;
-        frame.cameraImg = img;
-        dataBuffer.push_back(frame);
-
+        frame.cameraImg = img; //color image
+        if (dataBuffer.size() < dataBufferSize)
+        {
+            dataBuffer.push_back(frame);
+            cout << " Push new image #" << imgIndex <<" to the ring buffer" << endl;
+        }
+        else
+        {
+            dataBuffer.erase(dataBuffer.begin());
+            dataBuffer.push_back(frame);
+            cout << " Erase oldest and push new image #" << imgIndex <<" to the ring buffer" << endl;
+        }
         cout << "#1 : LOAD IMAGE INTO BUFFER done" << endl;
 
 
@@ -132,7 +143,7 @@ int main(int argc, const char *argv[])
         bVis = true;
         if(bVis)
         {
-            show3DObjects((dataBuffer.end()-1)->boundingBoxes, cv::Size(4.0, 20.0), cv::Size(2000, 2000), true);
+            //show3DObjects((dataBuffer.end()-1)->boundingBoxes, cv::Size(4.0, 20.0), cv::Size(2000, 2000), true);
         }
         bVis = false;
 
@@ -140,7 +151,7 @@ int main(int argc, const char *argv[])
         
         
         // REMOVE THIS LINE BEFORE PROCEEDING WITH THE FINAL PROJECT
-        continue; // skips directly to the next image without processing what comes beneath
+        //continue; // skips directly to the next image without processing what comes beneath
 
         /* DETECT IMAGE KEYPOINTS */
 
@@ -154,11 +165,15 @@ int main(int argc, const char *argv[])
 
         if (detectorType.compare("SHITOMASI") == 0)
         {
-            detKeypointsShiTomasi(keypoints, imgGray, false);
+            retVal = detKeypointsShiTomasi(keypoints, imgGray, false);
+        }
+        else if (detectorType.compare("HARRIS") == 0)
+        {
+            retVal = detKeypointsHarris(keypoints, imgGray, false);
         }
         else
         {
-            //...
+            retVal = detKeypointsModern(keypoints, imgGray, detectorType, false);
         }
 
         // optional : limit number of keypoints (helpful for debugging and learning)
@@ -185,7 +200,7 @@ int main(int argc, const char *argv[])
 
         cv::Mat descriptors;
         string descriptorType = "BRISK"; // BRISK, BRIEF, ORB, FREAK, AKAZE, SIFT
-        descKeypoints((dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->cameraImg, descriptors, descriptorType);
+        retVal = descKeypoints((dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->cameraImg, descriptors, descriptorType);
 
         // push descriptors for current frame to end of data buffer
         (dataBuffer.end() - 1)->descriptors = descriptors;
@@ -201,9 +216,9 @@ int main(int argc, const char *argv[])
             vector<cv::DMatch> matches;
             string matcherType = "MAT_BF";        // MAT_BF, MAT_FLANN
             string descriptorType = "DES_BINARY"; // DES_BINARY, DES_HOG
-            string selectorType = "SEL_NN";       // SEL_NN, SEL_KNN
+            string selectorType = "SEL_KNN";       // SEL_NN, SEL_KNN
 
-            matchDescriptors((dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints,
+            retVal = matchDescriptors((dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints,
                              (dataBuffer.end() - 2)->descriptors, (dataBuffer.end() - 1)->descriptors,
                              matches, descriptorType, matcherType, selectorType);
 
@@ -215,13 +230,12 @@ int main(int argc, const char *argv[])
             
             /* TRACK 3D OBJECT BOUNDING BOXES */
 
-            //// STUDENT ASSIGNMENT
             //// TASK FP.1 -> match list of 3D objects (vector<BoundingBox>) between current and previous frame (implement ->matchBoundingBoxes)
             map<int, int> bbBestMatches;
-            matchBoundingBoxes(matches, bbBestMatches, *(dataBuffer.end()-2), *(dataBuffer.end()-1)); // associate bounding boxes between current and previous frame using keypoint matches
-            //// EOF STUDENT ASSIGNMENT
+            // associate bounding boxes between current and previous frame using keypoint matches
+            matchBoundingBoxes(matches, bbBestMatches, *(dataBuffer.end()-2), *(dataBuffer.end()-1));
 
-            // store matches in current data frame
+            // store best BB matches in current data frame
             (dataBuffer.end()-1)->bbMatches = bbBestMatches;
 
             cout << "#8 : TRACK 3D OBJECT BOUNDING BOXES done" << endl;
@@ -229,11 +243,12 @@ int main(int argc, const char *argv[])
 
             /* COMPUTE TTC ON OBJECT IN FRONT */
 
-            // loop over all BB match pairs
+            // loop over all BB match pairs in current data frame
             for (auto it1 = (dataBuffer.end() - 1)->bbMatches.begin(); it1 != (dataBuffer.end() - 1)->bbMatches.end(); ++it1)
             {
                 // find bounding boxes associates with current match
                 BoundingBox *prevBB, *currBB;
+                // key/value pair is accessed via map.begin()->first, map.begin()->second
                 for (auto it2 = (dataBuffer.end() - 1)->boundingBoxes.begin(); it2 != (dataBuffer.end() - 1)->boundingBoxes.end(); ++it2)
                 {
                     if (it1->second == it2->boxID) // check wether current match partner corresponds to this BB
@@ -242,30 +257,28 @@ int main(int argc, const char *argv[])
                     }
                 }
 
-                for (auto it2 = (dataBuffer.end() - 2)->boundingBoxes.begin(); it2 != (dataBuffer.end() - 2)->boundingBoxes.end(); ++it2)
+                for (auto it3 = (dataBuffer.end() - 2)->boundingBoxes.begin(); it3 != (dataBuffer.end() - 2)->boundingBoxes.end(); ++it3)
                 {
-                    if (it1->first == it2->boxID) // check wether current match partner corresponds to this BB
+                    if (it1->first == it3->boxID) // check wether current match partner corresponds to this BB
                     {
-                        prevBB = &(*it2);
+                        prevBB = &(*it3);
                     }
                 }
 
                 // compute TTC for current match
                 if( currBB->lidarPoints.size()>0 && prevBB->lidarPoints.size()>0 ) // only compute TTC if we have Lidar points
                 {
-                    //// STUDENT ASSIGNMENT
+
                     //// TASK FP.2 -> compute time-to-collision based on Lidar data (implement -> computeTTCLidar)
                     double ttcLidar; 
                     computeTTCLidar(prevBB->lidarPoints, currBB->lidarPoints, sensorFrameRate, ttcLidar);
-                    //// EOF STUDENT ASSIGNMENT
 
-                    //// STUDENT ASSIGNMENT
                     //// TASK FP.3 -> assign enclosed keypoint matches to bounding box (implement -> clusterKptMatchesWithROI)
+                    clusterKptMatchesWithROI(*currBB, (dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->kptMatches);   
+
                     //// TASK FP.4 -> compute time-to-collision based on camera (implement -> computeTTCCamera)
-                    double ttcCamera;
-                    clusterKptMatchesWithROI(*currBB, (dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->kptMatches);                    
+                    double ttcCamera;                 
                     computeTTCCamera((dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints, currBB->kptMatches, sensorFrameRate, ttcCamera);
-                    //// EOF STUDENT ASSIGNMENT
 
                     bVis = true;
                     if (bVis)

@@ -29,6 +29,7 @@ void detectObjects(cv::Mat& img, std::vector<BoundingBox>& bBoxes, float confThr
     net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
     
     // generate 4D blob from input image
+    // output blob is input to network
     cv::Mat blob;
     vector<cv::Mat> netOutput;
     double scalefactor = 1/255.0;
@@ -40,8 +41,8 @@ void detectObjects(cv::Mat& img, std::vector<BoundingBox>& bBoxes, float confThr
     
     // Get names of output layers
     vector<cv::String> names;
-    vector<int> outLayers = net.getUnconnectedOutLayers(); // get  indices of  output layers, i.e.  layers with unconnected outputs
-    vector<cv::String> layersNames = net.getLayerNames(); // get  names of all layers in the network
+    vector<int> outLayers = net.getUnconnectedOutLayers(); // get indices of  output layers, i.e.  layers with unconnected outputs
+    vector<cv::String> layersNames = net.getLayerNames(); // get names of all layers in the network
     
     names.resize(outLayers.size());
     for (size_t i = 0; i < outLayers.size(); ++i) // Get the names of the output layers in names
@@ -63,12 +64,13 @@ void detectObjects(cv::Mat& img, std::vector<BoundingBox>& bBoxes, float confThr
             double confidence;
             
             // Get the value and location of the maximum score
+            // cv::minMaxLoc() finds the minimum and maximum element values and their positions with extremums searched across the whole array.
             cv::minMaxLoc(scores, 0, &confidence, 0, &classId);
             if (confidence > confThreshold)
             {
                 cv::Rect box; int cx, cy;
-                cx = (int)(data[0] * img.cols);
-                cy = (int)(data[1] * img.rows);
+                cx = (int)(data[0] * img.cols); // center in x
+                cy = (int)(data[1] * img.rows); // center in y
                 box.width = (int)(data[2] * img.cols);
                 box.height = (int)(data[3] * img.rows);
                 box.x = cx - box.width/2; // left
@@ -81,7 +83,7 @@ void detectObjects(cv::Mat& img, std::vector<BoundingBox>& bBoxes, float confThr
         }
     }
     
-    // perform non-maxima suppression
+    // perform non-maxima suppression, to avoid the occurrence of redundant boxes
     vector<int> indices;
     cv::dnn::NMSBoxes(boxes, confidences, confThreshold, nmsThreshold, indices);
     for(auto it=indices.begin(); it!=indices.end(); ++it) {
