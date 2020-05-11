@@ -95,7 +95,7 @@ int main(int argc, const char *argv[])
             // descriptor "SIFT" doesn't work with any detector type
             // descriptor "ORB" doesn't work with detector "SIFT"
             if ((descriptorType == "AKAZE" && detectorType != "AKAZE")
-            //|| (descriptorType == "SIFT")
+            || (descriptorType == "SIFT")
             || (descriptorType == "ORB" && detectorType == "SIFT")
             )
             {
@@ -131,7 +131,7 @@ int main(int argc, const char *argv[])
     // Loop over performance evaluation list
     for (auto& perfEval : perfEvalList)
     {
-        string detectorType = perfEval.detectorType;
+        string detectorType =   perfEval.detectorType;
         string descriptorType = perfEval.descriptorType;
         string matcherType = perfEval.matcherType;
         string selectorType = perfEval.selectorType;
@@ -226,7 +226,7 @@ int main(int argc, const char *argv[])
 
             // extract 2D keypoints from current image
             vector<cv::KeyPoint> keypoints; // create empty feature list for current image
-            string detectorType = "SHITOMASI";
+            //string detectorType = "SHITOMASI";
 
             if (detectorType.compare("SHITOMASI") == 0)
             {
@@ -266,7 +266,7 @@ int main(int argc, const char *argv[])
             /* EXTRACT KEYPOINT DESCRIPTORS */
 
             cv::Mat descriptors;
-            string descriptorType = "BRISK"; // BRISK, BRIEF, ORB, FREAK, AKAZE, SIFT
+            //string descriptorType = "BRISK"; // BRISK, BRIEF, ORB, FREAK, AKAZE, SIFT
             retVal = descKeypoints((dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->cameraImg, descriptors, descriptorType);
             perfEval.timeDescriptorExtraction[imgIndex] = retVal.deltaTime;
 
@@ -282,9 +282,9 @@ int main(int argc, const char *argv[])
                 /* MATCH KEYPOINT DESCRIPTORS */
 
                 vector<cv::DMatch> matches;
-                string matcherType = "MAT_BF";        // MAT_BF, MAT_FLANN
-                string descriptorType = "DES_BINARY"; // DES_BINARY, DES_HOG
-                string selectorType = "SEL_KNN";       // SEL_NN, SEL_KNN
+                //string matcherType = "MAT_BF";        // MAT_BF, MAT_FLANN
+                //string descriptorType = "DES_BINARY"; // DES_BINARY, DES_HOG
+                //string selectorType = "SEL_KNN";       // SEL_NN, SEL_KNN
 
                 retVal = matchDescriptors((dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints,
                                 (dataBuffer.end() - 2)->descriptors, (dataBuffer.end() - 1)->descriptors,
@@ -344,7 +344,7 @@ int main(int argc, const char *argv[])
                         double ttcLidar; 
                         computeTTCLidar(prevBB->lidarPoints, currBB->lidarPoints, sensorFrameRate, ttcLidar);
                         perfEval.ttcLidar[imgIndex] = ttcLidar;
-                        cout << "computeTTCLidar -- ttcLidar = " << ttcLidar << " s"<< endl; 
+                        cout << "#9 : Compute TTC Lidar Done -- ttcLidar = " << ttcLidar << " s"<< endl;
 
                         //// TASK FP.3 -> assign enclosed keypoint matches to bounding box (implement -> clusterKptMatchesWithROI)
                         clusterKptMatchesWithROI(*currBB, (dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->kptMatches);   
@@ -353,9 +353,9 @@ int main(int argc, const char *argv[])
                         double ttcCamera;                 
                         computeTTCCamera((dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints, currBB->kptMatches, sensorFrameRate, ttcCamera);
                         perfEval.ttcCamera[imgIndex] = ttcCamera;
-                        cout << "computeTTCCamera -- ttcCamera = " << ttcCamera << " s"<< endl; 
+                        cout << "#10: Compute TTC Camera Done -- ttcCamera = " << ttcCamera << " s"<< endl;
 
-                        //bVis = true;
+                        // bVis = true;
                         if (bVis)
                         {
                             cv::Mat visImg = (dataBuffer.end() - 1)->cameraImg.clone();
