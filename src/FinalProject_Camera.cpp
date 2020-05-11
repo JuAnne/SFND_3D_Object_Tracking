@@ -95,7 +95,7 @@ int main(int argc, const char *argv[])
             // descriptor "SIFT" doesn't work with any detector type
             // descriptor "ORB" doesn't work with detector "SIFT"
             if ((descriptorType == "AKAZE" && detectorType != "AKAZE")
-            || (descriptorType == "SIFT")
+            //|| (descriptorType == "SIFT")
             || (descriptorType == "ORB" && detectorType == "SIFT")
             )
             {
